@@ -3,7 +3,9 @@ from fastapi import FastAPI
 from sqlmodel import SQLModel
 
 from config import engine
-from Controller.UserController import user_router
+from Controller.UserController import router as user_router
+from Controller.ProblemController import router as problem_router
+
 
 
 
@@ -17,6 +19,7 @@ def create_app() -> FastAPI:
 
     # 注册路由
     app.include_router(user_router, prefix="/users", tags=["User"])
+    app.include_router(problem_router, prefix="/problems", tags=["Problem"])
 
 
     @app.get("/health")

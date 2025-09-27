@@ -4,18 +4,18 @@ from service.UserService import UserService
 from utils.security import decode_access_token
 from pojo.Result import Result
 
-user_router = APIRouter(tags=["用户接口"])
+router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")  # 登录接口路径
 
 # ---------------- 注册 ----------------
-@user_router.post("/register")
+@router.post("/register")
 def register(name: str, password: str) -> Result:
     return UserService.register(name, password)
 
 
 # ---------------- 登录 ----------------
-@user_router.post("/login")
+@router.post("/login")
 def login(name: str, password: str) -> Result:
     return UserService.login(name, password)
 
@@ -29,6 +29,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 
 # ---------------- 需要登录的接口示例 ----------------
-@user_router.get("/me")
+@router.get("/me")
 def get_me(current_user=Depends(get_current_user)) -> Result:
     return Result.success(data=current_user, message="当前用户信息")
