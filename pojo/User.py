@@ -1,6 +1,9 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+
+from pojo.Submission import Submission
+
 
 # --- 数据模型 ---
 class User(SQLModel, table=True):
@@ -11,6 +14,7 @@ class User(SQLModel, table=True):
     password: str
     create_at: datetime = Field(default_factory=datetime.utcnow)
     update_at: datetime = Field(default_factory=datetime.utcnow)
+    submissions: List["Submission"] = Relationship(back_populates="user")
 
 
 class UserCreate(SQLModel):

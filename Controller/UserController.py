@@ -4,7 +4,7 @@ from service.UserService import UserService
 from utils.security import decode_access_token
 from pojo.Result import Result
 
-user_router = APIRouter(prefix="/users", tags=["用户接口"])
+user_router = APIRouter(tags=["用户接口"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")  # 登录接口路径
 
