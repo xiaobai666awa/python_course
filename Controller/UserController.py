@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
+
 from service.UserService import UserService
 from utils.security import decode_access_token
 from pojo.Result import Result
@@ -7,11 +9,15 @@ from pojo.Result import Result
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")  # 登录接口路径
+class RegisterRequest(BaseModel):
+    name: str
+    password: str
 
 # ---------------- 注册 ----------------
 @router.post("/register")
-def register(name: str, password: str) -> Result:
-    return UserService.register(name, password)
+def register(req: RegisterRequest) -> Result:
+    return UserService.register(req.name, req.password)
+
 
 
 # ---------------- 登录 ----------------

@@ -1,6 +1,9 @@
 # pojo/Submission.py
+from __future__ import annotations
 from datetime import datetime
 from typing import Optional
+
+from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import SQLModel, Field, Relationship
 from pydantic import BaseModel
 
@@ -22,7 +25,6 @@ class Submission(SQLModel, table=True):
     # 关系（方便 ORM 联查）
     problem: Optional["Problem"] = Relationship(back_populates="submissions")
     user: Optional["User"] = Relationship(back_populates="submissions")
-
 
 class SubmissionCreate(BaseModel):
     problem_id: int

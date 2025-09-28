@@ -38,7 +38,7 @@ class UserService:
             return Result.error(message="用户不存在", code=404)
         return Result.success(data=user)
     @staticmethod
-    def register(name: str, password: str) -> Result[UserRead]:
+    def register(name: str, password: str) -> Result[None] | Result[UserRead]:
         user = UserMapper.find_by_name(name)
         if user:
             return Result.error(message="用户名已存在", code=400)
@@ -47,7 +47,7 @@ class UserService:
         return Result.success(data=new_user, message="注册成功")
 
     @staticmethod
-    def login(name: str, password: str) -> Result[str]:
+    def login(name: str, password: str) -> Result[None] | Result[UserRead]:
         user = UserMapper.find_by_name(name)
         if not user:
             return Result.error(message="用户不存在", code=404)
