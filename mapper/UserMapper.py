@@ -3,7 +3,6 @@ from sqlmodel import Session, select
 from config import engine
 from pojo.User import UserCreate, User, UserRead, UserUpdate
 
-
 class UserMapper:
 
     @staticmethod

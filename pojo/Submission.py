@@ -2,16 +2,13 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
-
 from sqlalchemy import Column
 from sqlalchemy.dialects.mysql import TINYTEXT
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import SQLModel, Field, Relationship
 from pydantic import BaseModel
-
 from pojo.Problem import Problem
 from pojo.User import User
-
 
 class Submission(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -27,13 +24,13 @@ class Submission(SQLModel, table=True):
     problem: Optional["Problem"] = Relationship(back_populates="submissions")
     user: Optional["User"] = Relationship(back_populates="submissions")
 
-class SubmissionCreate(BaseModel):
+class SubmissionCreate(SQLModel):
     problem_id: int
     user_id: int
     user_answer: str # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
 
 
-class SubmissionRead(BaseModel):
+class SubmissionRead(SQLModel):
     id: int
     problem_id: int
     user_id: int

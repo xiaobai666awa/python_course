@@ -7,7 +7,7 @@ from pojo.Problem import ProblemRead, Problem, ProblemCreate
 
 router = APIRouter()
 
-@router.get("/{problem_id}", response_model=ProblemRead)
+@router.get("/{problem_id}", response_model=Result[ProblemRead])
 def get_problem_by_id(problem_id: int):
     """根据 ID 获取题目"""
     problem = ProblemService.get_problem_by_id(problem_id)
@@ -16,7 +16,7 @@ def get_problem_by_id(problem_id: int):
     return problem
 
 
-@router.get("/", response_model=List[ProblemRead])
+@router.get("/", response_model=Result[List[ProblemRead]])
 def get_problems(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
