@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Column
+from sqlalchemy.dialects.mysql import TINYTEXT
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import SQLModel, Field, Relationship
 from pydantic import BaseModel
@@ -15,8 +17,7 @@ class Submission(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     problem_id: int = Field(foreign_key="problem.id")
     user_id: int = Field(foreign_key="user.id")
-
-    answer: str  # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
+    user_answer: str =Field(sa_column=Column(TINYTEXT))  # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
     status: str = Field(default="pending")  # pending / accepted / wrong / error
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -29,19 +30,19 @@ class Submission(SQLModel, table=True):
 class SubmissionCreate(BaseModel):
     problem_id: int
     user_id: int
-    answer: str
+    user_answer: str # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
 
 
 class SubmissionRead(BaseModel):
     id: int
     problem_id: int
     user_id: int
-    answer: str
+    user_answer: str  # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
     status: str
     created_at: datetime
     updated_at: datetime
 
 
 class SubmissionUpdate(BaseModel):
-    answer: Optional[str] = None
+    user_answer: str # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
     status: Optional[str] = None

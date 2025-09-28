@@ -23,7 +23,7 @@ class JudgeService:
     @staticmethod
     def judge_choice(problem: Problem, submission: Submission) -> str:
         """选择题判题"""
-        return "accepted" if submission.answer.strip() == problem.answer.strip() else "wrong"
+        return "accepted" if submission.user_answer.strip() == problem.answer.strip() else "wrong"
 
     @staticmethod
     def judge_fill(problem: Problem, submission: Submission) -> str:

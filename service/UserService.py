@@ -29,14 +29,14 @@ class UserService:
         user = UserMapper.find_by_id(user_id)
         if not user:
             return Result.error(message="用户不存在", code=404)
-        return Result.success(data=user)
+        return Result.success(data=UserMapper.to_read(user))
 
     @staticmethod
     def get_user_by_name(name: str) -> Result[None] | Result[UserRead]:
         user = UserMapper.find_by_name(name)
         if not user:
             return Result.error(message="用户不存在", code=404)
-        return Result.success(data=user)
+        return Result.success(data=UserMapper.to_read(user))
     @staticmethod
     def register(name: str, password: str) -> Result[None] | Result[UserRead]:
         user = UserMapper.find_by_name(name)

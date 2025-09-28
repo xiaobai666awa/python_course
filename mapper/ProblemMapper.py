@@ -2,7 +2,8 @@ from sqlmodel import Session, select
 from typing import List, Optional
 
 from config import engine
-from pojo.Problem import Problem, ProblemRead
+from pojo.Problem import Problem, ProblemRead, ProblemCreate
+from pojo.Result import Result
 
 
 class ProblemMapper:
@@ -11,6 +12,13 @@ class ProblemMapper:
     def to_read(problem: Problem) -> ProblemRead:
         """ORM -> ProblemRead"""
         return ProblemRead.model_validate(problem)
+    @staticmethod
+    def to_create(problem: Problem) -> ProblemCreate:
+        """ORM -> ProblemCreate"""
+        return ProblemCreate.model_validate(problem)
+    @staticmethod
+    def from_create(problem:ProblemCreate) -> Problem:
+        return Problem.model_validate(problem.model_dump())
 
     @staticmethod
     def find_by_id(problem_id: int) -> Optional[Problem]:
@@ -44,3 +52,12 @@ class ProblemMapper:
             stmt = select(Problem).where(Problem.title.like(f"%{name}%"))
             results = session.exec(stmt).all()
             return results
+    @staticmethod
+    def create(problem: ProblemCreate) -> ProblemRead:
+        problem = ProblemMapper.from_create(problem)
+        with Session(engine) as session:
+            session.add(problem)
+            session.commit()
+            session.refresh(problem)
+        return ProblemMapper.to_read(problem)
+

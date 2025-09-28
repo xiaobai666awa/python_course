@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import List
 
+from pojo.Result import Result
 from service.ProblemService import ProblemService
-from pojo.Problem import ProblemRead
+from pojo.Problem import ProblemRead, Problem, ProblemCreate
 
 router = APIRouter()
 
@@ -28,3 +29,6 @@ def get_problems(
     if name:
         return ProblemService.get_problems_by_name(name)
     return ProblemService.get_problems_by_page(page, page_size)
+@router.post("/create", response_model=Result[ProblemRead])
+def create_problem(problem: ProblemCreate):
+    return ProblemService.create_problem(problem)
