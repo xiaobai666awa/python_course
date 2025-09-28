@@ -1,4 +1,6 @@
-from typing import Any
+import csv
+from io import StringIO
+from typing import Any, IO, List
 
 from mapper.UserMapper import UserMapper
 from pojo.User import User, UserRead
@@ -57,3 +59,32 @@ class UserService:
         # 生成 JWT
         token = create_access_token({"sub": str(user.id), "name": user.name})
         return Result.success(data=token, message="登录成功")
+    @staticmethod
+    def import_users_from_csv(file: IO) -> Result[None] | Result[list[UserRead]]:
+        """
+        批量导入用户
+        file: CSV 文件流, 必须包含 name,password 两列
+        """
+        try:
+            # 解析 CSV 文件
+            file_content = file.read().decode("utf-8") if isinstance(file.read(), bytes) else file.read()
+            csv_reader = csv.DictReader(StringIO(file_content))
+            users_to_add = []
+            for row in csv_reader:
+                if "name" in row and "password" in row:
+                    users_to_add.append({
+                        "name": row["name"].strip(),
+                        "password": row["password"].strip()
+                    })
+
+            if not users_to_add:
+                return Result.error(message="CSV 文件中未找到有效用户数据")
+
+            # 批量插入
+            inserted_users = UserMapper.bulk_insert(users_to_add)
+
+            # 返回 Result
+            return Result.success(data=[UserRead.model_validate(u) for u in inserted_users],
+                                  message=f"成功导入 {len(inserted_users)} 个用户")
+        except Exception as e:
+            return Result.error(message=f"导入失败: {str(e)}")

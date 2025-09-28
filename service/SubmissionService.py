@@ -2,7 +2,7 @@ from sqlmodel import Session
 from typing import List, Optional, Any
 
 from config import engine
-from pojo.Submission import Submission
+from pojo.Submission import Submission, SubmissionUpdate
 from pojo.Problem import Problem
 from mapper.SubmissionMapper import SubmissionMapper
 from mapper.ProblemMapper import ProblemMapper
@@ -59,11 +59,11 @@ class SubmissionService:
     @staticmethod
     def update_submission_status(submission_id: int, status: str) -> Result[None] | Result[Submission]:
         with Session(engine) as session:
-            submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id, session)
+            submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id)
             if not submission:
                 return Result.error(message="提交记录不存在")
-
-            submission.status = status
-            submission.completed = True
-            SubmissionMapper.update(submission, session)
+            submission_update=SubmissionUpdate.model_value(submission)
+            submission_update.status = status
+            submission_update.completed = True
+            SubmissionMapper.update(submission,submission_update)
             return Result.success(data=submission, message="更新成功")

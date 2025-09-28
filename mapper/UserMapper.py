@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import List, Dict
+
 from sqlmodel import Session, select
 from config import engine
 from pojo.User import UserCreate, User, UserRead, UserUpdate
@@ -56,3 +58,18 @@ class UserMapper:
             stmt = select(User).where(User.id == id)
             user = session.exec(stmt).first()
             return user if user else None
+    @staticmethod
+    def bulk_insert(users: List[Dict[str, str]]) -> List[User]:
+        """
+        批量添加用户
+        users: List[Dict], 每个 Dict 包含 'name' 和 'password'
+        返回插入后的 User 对象列表
+        """
+        user_objects = [User(name=u["name"], password=u["password"]) for u in users]
+
+        with Session(engine) as session:
+            session.add_all(user_objects)  # 批量添加
+            session.commit()               # 提交事务
+            for user in user_objects:
+                session.refresh(user)      # 刷新每个对象，获取自增主键
+        return user_objects
