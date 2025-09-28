@@ -41,7 +41,7 @@ def admin_required(current_user: dict = Depends(get_current_user)):
     仅允许 admin 用户访问
     current_user 从 get_current_user 获取
     """
-    if current_user.get("username") != "admin":
+    if current_user.get("name") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="只有 admin 可以访问此接口"
@@ -55,11 +55,11 @@ def get_me(current_user=Depends(get_current_user)) -> Result:
 
 
 @router.post("/import")
-async def import_users(file: UploadFile = File(...), _: dict = Depends(admin_required)):
+async def import_users(file: UploadFile= File(...), _: dict = Depends(admin_required)):
     """批量导入用户（仅限 admin）"""
     try:
         # 调用 service 方法，传入文件流
-        result: Result[list[UserRead]] = UserService.import_users_from_csv(file.file)
+        result: Result[list[UserRead]] = UserService.import_users_from_csv(file.file.read())
         return result
     except Exception as e:
         # 捕获 service 之外的异常
