@@ -22,8 +22,8 @@ def register(req: RegisterRequest) -> Result:
 
 # ---------------- 登录 ----------------
 @router.post("/login")
-def login(name: str, password: str) -> Result:
-    return UserService.login(name, password)
+def login(req: RegisterRequest) -> Result:
+    return UserService.login(req.name, req.password)
 
 
 # ---------------- Token 验证依赖 ----------------

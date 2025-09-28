@@ -45,11 +45,11 @@ class UserMapper:
             return UserMapper.to_read(user)
 
     @staticmethod
-    def find_by_name(name: str) -> UserRead | None:
+    def find_by_name(name: str) -> User | None:
         with Session(engine) as session:
             stmt = select(User).where(User.name == name)
             user = session.exec(stmt).first()
-            return UserMapper.to_read(user) if user else None
+            return user if user else None
 
     @staticmethod
     def find_by_id(id: int) -> User | None:
