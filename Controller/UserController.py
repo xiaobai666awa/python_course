@@ -1,18 +1,16 @@
 import csv
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from starlette import status
 
 from pojo.User import UserRead
 from service.UserService import UserService
-from utils.security import decode_access_token
+from utils.security import  get_current_user
 from pojo.Result import Result
 
 router = APIRouter()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")  # 登录接口路径
 class RegisterRequest(BaseModel):
     name: str
     password: str
@@ -31,11 +29,7 @@ def login(req: RegisterRequest) -> Result:
 
 
 # ---------------- Token 验证依赖 ----------------
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token 无效或已过期")
-    return payload
+
 def admin_required(current_user: dict = Depends(get_current_user)):
     """
     仅允许 admin 用户访问

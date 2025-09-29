@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from typing import List
 
+from Controller.UserController import admin_required
 from pojo.Result import Result
 from service.ProblemService import ProblemService
 from pojo.Problem import ProblemRead, Problem, ProblemCreate
@@ -30,5 +31,5 @@ def get_problems(
         return ProblemService.get_problems_by_name(name)
     return ProblemService.get_problems_by_page(page, page_size)
 @router.post("/create", response_model=Result[ProblemRead])
-def create_problem(problem: ProblemCreate):
+def create_problem(problem: ProblemCreate,_: dict = Depends(admin_required)):
     return ProblemService.create_problem(problem)

@@ -32,6 +32,8 @@ class ProblemService:
         return Result.success(data=data, message="按名称查询成功")
 
     @staticmethod
-    def create_problem(problem: ProblemCreate) -> Result[ProblemRead]:
+    def create_problem(problem: ProblemCreate) -> Result[ProblemRead]|Result[None]:
+        if problem.code_id is None and problem.type is 'coding':
+            return Result.error(message="编程题请提供对应判题id")
         problem_read = ProblemMapper.create(problem)
         return Result.success(data=problem_read, message="成功创建题目")

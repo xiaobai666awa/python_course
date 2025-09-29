@@ -57,7 +57,7 @@ class UserService:
         if not verify_password(password, user.password):
             return Result.error(message="密码错误", code=401)
         # 生成 JWT
-        token = create_access_token({"sub": str(user.id), "name": user.name})
+        token = create_access_token({"sub": str(user.id), "name": user.name,"user_id": user.id})
         return Result.success(data=token, message="登录成功")
     @staticmethod
     def import_users_from_csv(file: bytes) -> Result[None] | Result[list[UserRead]]:

@@ -26,8 +26,8 @@ class SubmissionMapper:
     @staticmethod
     def apply_update(submission: Submission, submission_update: SubmissionUpdate) -> Submission:
         """在已有 ORM 对象上应用更新"""
-        if submission_update.answer is not None:
-            submission.answer = submission_update.answer
+        if submission_update.user_answer is not None:
+            submission.user_answer = submission_update.user_answer
         if submission_update.status is not None:
             submission.status = submission_update.status
         submission.updated_at = datetime.utcnow()
@@ -47,7 +47,7 @@ class SubmissionMapper:
     def update(submission: Submission, submission_update: SubmissionUpdate) -> Submission:
         """更新提交"""
         with Session(engine) as session:
-            SubmissionMapper.apply_update(submission, submission_update)
+            submission=SubmissionMapper.apply_update(submission, submission_update)
             session.add(submission)
             session.commit()
             session.refresh(submission)
@@ -74,11 +74,11 @@ class SubmissionMapper:
             stmt = select(Submission).where(Submission.problem_id == problem_id)
             return session.exec(stmt).all()
     @staticmethod
-    def insert(submission: Submission, session: Session) -> Submission:
-        """插入一条提交记录"""
-        session.add(submission)
-        session.commit()
-        session.refresh(submission)
+    def insert(submission: Submission) -> Submission:
+        with Session(engine) as session:
+            session.add(submission)
+            session.commit()
+            session.refresh(submission)
         return submission
 
     @staticmethod

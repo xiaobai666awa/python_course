@@ -5,7 +5,7 @@ from sqlmodel import SQLModel
 from config import engine
 from Controller.UserController import router as user_router
 from Controller.ProblemController import router as problem_router
-
+from Controller.SubmissionController import router as submission_router
 
 
 
@@ -20,8 +20,7 @@ def create_app() -> FastAPI:
     # 注册路由
     app.include_router(user_router, prefix="/users", tags=["User"])
     app.include_router(problem_router, prefix="/problems", tags=["Problem"])
-
-
+    app.include_router(submission_router, prefix="/submissions", tags=["Submission"])
     @app.get("/health")
     def health_check():
         return {"status": "ok"}

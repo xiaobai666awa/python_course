@@ -16,6 +16,7 @@ class ProblemType(str, Enum):
 # 数据库表模型
 class Problem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    code_id:Optional[int] =0
     title: str
     type: ProblemType
     description: str = Field(sa_column=Column(LONGTEXT))
@@ -27,6 +28,7 @@ class Problem(SQLModel, table=True):
 class ProblemCreate(SQLModel):
     title: str
     type: ProblemType
+    code_id: Optional[int] = None
     description: str
     options: Optional[List[str]] = None
     answer: Optional[str] = None
@@ -36,6 +38,7 @@ class ProblemCreate(SQLModel):
 class ProblemRead(SQLModel):
     id: int
     title: str
+    code_id: Optional[int]
     type: ProblemType
     description: str
     options: Optional[List[str]] = None
