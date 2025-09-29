@@ -43,10 +43,12 @@ class HojClient:
         }
         resp = await self._request("POST", url, json=payload)
         resp.raise_for_status()
+        print(resp.json())
         return resp.json()["data"]["submitId"]
 
     async def get_result(self, submit_id: int) -> int:
         url = f"{self.base_url}/api/get-submission-detail?submitId={submit_id}"
         resp = await self._request("GET", url)
         resp.raise_for_status()
-        return resp.json()["data"]['status']
+        print(resp.json())
+        return resp.json()["data"]['submission']['status']

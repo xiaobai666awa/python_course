@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
+from Controller.UserController import admin_required
 from pojo.Result import Result
 from pojo.Submission import Submission, SubmissionCreate
 from service.SubmissionService import SubmissionService
@@ -11,7 +12,7 @@ router = APIRouter()
 
 
 @router.post("/submit", response_model=Result[Submission])
-def submit_answer(
+async def submit_answer(
     submission:SubmissionCreate,
     current_user: dict = Depends(get_current_user)  # 鉴权
 ):
@@ -38,7 +39,15 @@ def get_user_submissions(
     user_id = current_user.get("user_id")
     return SubmissionService.get_user_submissions(user_id, problem_id)
 
-
+@router.get("/{submission_id}", response_model=Result[Submission])
+def get_submissions(
+    submission_id:int,
+    current_user: dict = Depends(get_current_user)
+):
+    result=SubmissionService.get_submission_by_id(submission_id)
+    if result.data.user_id != current_user.get("user_id") and admin_required():
+        raise HTTPException(status_code=401, detail="无访问权限")
+    return result
 @router.get("/user", response_model=Result[List[Submission]])
 def get_all_user_submissions(
     current_user: dict = Depends(get_current_user)

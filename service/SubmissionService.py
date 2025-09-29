@@ -1,4 +1,5 @@
 import asyncio
+from time import sleep
 
 from sqlmodel import Session
 from typing import List, Optional, Any
@@ -32,8 +33,8 @@ class SubmissionService:
                 SubmissionMapper.insert(submission)
 
                 # 如果是编程题，丢给 HOJ 判题机异步执行
-                if problem.type in ("CODING", "编程题"):
-                    asyncio.create_task(SubmissionService._judge_with_hoj(submission.id, problem.id, data))
+                if problem.type in ("coding", "编程题"):
+                    asyncio.create_task(SubmissionService._judge_with_hoj(submission.id, problem.code_id, data))
 
                 else:  # 选择题/填空题直接判分
                     correct_answer = problem.answer
@@ -47,20 +48,20 @@ class SubmissionService:
                 return Result.success(data=submission, message="提交成功")
 
     @staticmethod
-    async def _judge_with_hoj(submission_id: int, problem_id: int, code: str):
+    async def _judge_with_hoj(submission_id: int, code_id: int, code: str):
             """
             异步提交到 HOJ 并回写数据库
             """
             client = HojClient()
-            submit_id = await client.submit(pid=str(problem_id), code=code)
+            submit_id = await client.submit(pid=str(code_id), code=code)
 
             # 轮询判题结果
             while True:
                 result = await client.get_result(submit_id)
                 status = result
                 if status <1:
-                    status = "accepted" if status == 1 else "rejected"
-                    submission=SubmissionMapper.find_by_id(submit_id)
+                    status = "accepted" if status == 0 else "rejected"
+                    submission=SubmissionMapper.find_by_id(submission_id)
                     submission_update=SubmissionUpdate(status=status,user_answer=code)
                     SubmissionMapper.update(submission, submission_update)
                     break
@@ -89,3 +90,7 @@ class SubmissionService:
             return Result.success(data=submission, message="更新成功")
 
 
+    @staticmethod
+    def get_submission_by_id(submission_id: int) -> Result[Submission]:
+        submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id)
+        return Result.success(data=submission,message="成功获取submission")
