@@ -38,5 +38,5 @@ class SubmissionRead(SQLModel):
 
 
 class SubmissionUpdate(BaseModel):
-    user_answer: str # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
+    user_answer: Optional[str] = None  # 用户提交的答案（字符串，或者 JSON 序列化后的数据）
     status: Optional[str] = None

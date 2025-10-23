@@ -16,10 +16,14 @@ class SubmissionMapper:
     @staticmethod
     def from_create(submission_create: SubmissionCreate) -> Submission:
         """SubmissionCreate -> ORM"""
+        user_id = getattr(submission_create, "user_id", None)
+        if user_id is None:
+            raise ValueError("submission_create 缺少 user_id")
+
         return Submission(
             problem_id=submission_create.problem_id,
-            user_id=submission_create.user_id,
-            answer=submission_create.answer,
+            user_id=user_id,
+            user_answer=submission_create.user_answer,
             status="pending",
         )
 
@@ -47,11 +51,15 @@ class SubmissionMapper:
     def update(submission: Submission, submission_update: SubmissionUpdate) -> Submission:
         """更新提交"""
         with Session(engine) as session:
-            submission=SubmissionMapper.apply_update(submission, submission_update)
-            session.add(submission)
+            db_submission = session.get(Submission, submission.id)
+            if not db_submission:
+                raise ValueError("提交记录不存在，无法更新")
+
+            SubmissionMapper.apply_update(db_submission, submission_update)
+            session.add(db_submission)
             session.commit()
-            session.refresh(submission)
-            return submission
+            session.refresh(db_submission)
+            return db_submission
 
     @staticmethod
     def find_by_id(submission_id: int) -> Optional[Submission]:

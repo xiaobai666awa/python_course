@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlmodel import Session, select
 from typing import List, Optional
 
@@ -29,13 +30,16 @@ class ProblemMapper:
             return result
 
     @staticmethod
-    def find_by_page(page: int, page_size: int = 20) -> List[Problem]:
+    def paginate(page: int, page_size: int = 20) -> tuple[List[Problem], int]:
         """分页获取题目"""
         with Session(engine) as session:
+            total_stmt = select(func.count()).select_from(Problem)
+            total = session.exec(total_stmt).one()
+
             offset = (page - 1) * page_size
             stmt = select(Problem).offset(offset).limit(page_size)
             results = session.exec(stmt).all()
-            return results
+            return list(results), total
 
     @staticmethod
     def find_by_type(problem_type: str) -> List[Problem]:
@@ -60,4 +64,3 @@ class ProblemMapper:
             session.commit()
             session.refresh(problem)
         return ProblemMapper.to_read(problem)
-

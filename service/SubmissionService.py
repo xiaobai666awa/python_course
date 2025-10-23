@@ -1,71 +1,82 @@
 import asyncio
-from time import sleep
+from typing import List, Optional
 
 from sqlmodel import Session
-from typing import List, Optional, Any
 
 from config import engine
-from pojo.Submission import Submission, SubmissionUpdate
-from pojo.Problem import Problem
-from mapper.SubmissionMapper import SubmissionMapper
 from mapper.ProblemMapper import ProblemMapper
+from mapper.SubmissionMapper import SubmissionMapper
+from pojo.Problem import Problem, ProblemType
 from pojo.Result import Result
+from pojo.Submission import Submission, SubmissionUpdate
 from service.HojService import HojClient
+from service.ProblemSetService import ProblemSetService
 
 
 class SubmissionService:
 
 
     @staticmethod
-    def submit_answer(user_id: int, problem_id: int, data: str) -> Result[None] | Result[Submission]:
+    def submit_answer(user_id: int, problem_id: int, user_answer: str) -> Result[Submission] | Result[None]:
+        problem: Optional[Problem] = ProblemMapper.find_by_id(problem_id)
+        if not problem:
+            return Result.error(message="题目不存在", code=404)
 
-                problem: Optional[Problem] = ProblemMapper.find_by_id(problem_id)
-                if not problem:
-                    return Result.error(message="题目不存在")
+        is_coding = SubmissionService._is_coding_problem(problem)
 
-                submission = Submission(
-                    user_id=user_id,
-                    problem_id=problem_id,
-                    data=data,
-                    status="PENDING",
-                )
+        if is_coding and not getattr(problem, "code_id", None):
+            return Result.error(message="编程题缺少判题配置", code=400)
 
-                SubmissionMapper.insert(submission)
+        submission = Submission(
+            user_id=user_id,
+            problem_id=problem_id,
+            user_answer=user_answer,
+            status="pending",
+        )
 
-                # 如果是编程题，丢给 HOJ 判题机异步执行
-                if problem.type in ("coding", "编程题"):
-                    asyncio.create_task(SubmissionService._judge_with_hoj(submission.id, problem.code_id, data))
+        SubmissionMapper.insert(submission)
 
-                else:  # 选择题/填空题直接判分
-                    correct_answer = problem.answer
-                    if correct_answer and correct_answer == data:
-                        status = "accepted"
-                    else:
-                        status = "wrong"
-                    user_answer = data
-                    SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
+        if is_coding:
+            asyncio.create_task(
+                SubmissionService._judge_with_hoj(submission.id, problem.code_id, user_answer)
+            )
+        else:
+            status = SubmissionService._evaluate_answer(problem.answer, user_answer)
+            SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
+            submission.status = status
+            if status == "accepted":
+                ProblemSetService.refresh_completion_for_user(user_id, [problem_id])
 
-                return Result.success(data=submission, message="提交成功")
+        return Result.success(data=submission, message="提交成功")
 
     @staticmethod
     async def _judge_with_hoj(submission_id: int, code_id: int, code: str):
-            """
-            异步提交到 HOJ 并回写数据库
-            """
-            client = HojClient()
-            submit_id = await client.submit(pid=str(code_id), code=code)
+        """
+        异步提交到 HOJ 并回写数据库
+        """
+        try:
+            async with HojClient() as client:
+                submit_id = await client.submit(pid=str(code_id), code=code)
 
-            # 轮询判题结果
-            while True:
-                result = await client.get_result(submit_id)
-                status = result
-                if status <1:
-                    status = "accepted" if status == 0 else "rejected"
-                    submission=SubmissionMapper.find_by_id(submission_id)
-                    submission_update=SubmissionUpdate(status=status,user_answer=code)
-                    SubmissionMapper.update(submission, submission_update)
-                    break
-                await asyncio.sleep(2)
+                while True:
+                    status_code = await client.get_result(submit_id)
+                    if status_code < 1:
+                        final_status = "accepted" if status_code == 0 else "rejected"
+                        submission = SubmissionMapper.find_by_id(submission_id)
+                        if submission:
+                            updated = SubmissionMapper.update(
+                                submission,
+                                SubmissionUpdate(status=final_status, user_answer=code),
+                            )
+                            if final_status == "accepted":
+                                ProblemSetService.refresh_completion_for_user(updated.user_id, [updated.problem_id])
+                        break
+                    await asyncio.sleep(2)
+        except Exception:
+            submission = SubmissionMapper.find_by_id(submission_id)
+            if submission:
+                SubmissionMapper.update(submission, SubmissionUpdate(status="error"))
+
     @staticmethod
     def get_user_submissions(user_id: int, problem_id: int) -> Result[List[Submission]]:
         with Session(engine) as session:
@@ -79,18 +90,33 @@ class SubmissionService:
             return Result.success(data=submissions)
 
     @staticmethod
-    def update_submission_status(submission_id: int, status: str) -> Result[None] | Result[Submission]:
-        with Session(engine) as session:
-            submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id)
-            if not submission:
-                return Result.error(message="提交记录不存在")
-            submission_update=SubmissionUpdate.model_value(submission)
-            submission_update.status = status
-            SubmissionMapper.update(submission,submission_update)
-            return Result.success(data=submission, message="更新成功")
+    def update_submission_status(submission_id: int, status: str) -> Result[Submission] | Result[None]:
+        submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id)
+        if not submission:
+            return Result.error(message="提交记录不存在", code=404)
+
+        updated = SubmissionMapper.update(submission, SubmissionUpdate(status=status))
+        if status == "accepted":
+            ProblemSetService.refresh_completion_for_user(updated.user_id, [updated.problem_id])
+        return Result.success(data=updated, message="更新成功")
 
 
     @staticmethod
     def get_submission_by_id(submission_id: int) -> Result[Submission]:
         submission: Optional[Submission] = SubmissionMapper.find_by_id(submission_id)
-        return Result.success(data=submission,message="成功获取submission")
+        if not submission:
+            return Result.error(message="提交记录不存在", code=404)
+        return Result.success(data=submission, message="成功获取submission")
+
+    @staticmethod
+    def _is_coding_problem(problem: Problem) -> bool:
+        problem_type = getattr(problem, "type", None)
+        if isinstance(problem_type, ProblemType):
+            return problem_type == ProblemType.CODING
+        return str(problem_type).lower() in {"coding", "编程题"}
+
+    @staticmethod
+    def _evaluate_answer(correct_answer: Optional[str], user_answer: str) -> str:
+        if correct_answer and correct_answer == user_answer:
+            return "accepted"
+        return "wrong"
