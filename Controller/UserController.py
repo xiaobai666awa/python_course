@@ -53,7 +53,7 @@ async def import_users(file: UploadFile= File(...), _: dict = Depends(admin_requ
     """批量导入用户（仅限 admin）"""
     try:
         # 调用 service 方法，传入文件流
-        result: Result[list[UserRead]] = UserService.import_users_from_csv(file.file.read())
+        result: Result[list[UserRead]] = UserService.import_users_from_csv(file.file)
         return result
     except Exception as e:
         # 捕获 service 之外的异常

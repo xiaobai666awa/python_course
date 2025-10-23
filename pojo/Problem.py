@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, Field
 from sqlalchemy import Column
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.dialects.mysql import JSON
-from typing import Optional, List
+from typing import List, Optional
 from enum import Enum
 from pydantic import BaseModel
 
@@ -45,3 +45,10 @@ class ProblemRead(SQLModel):
     answer: Optional[str] = None
     class Config:
         from_attributes = True
+
+
+class ProblemPage(SQLModel):
+    items: List[ProblemRead]
+    total: int
+    page: int
+    page_size: int

@@ -6,7 +6,7 @@ from Controller.UserController import admin_required
 from pojo.Result import Result
 from pojo.Submission import Submission, SubmissionCreate
 from service.SubmissionService import SubmissionService
-from utils.security import get_current_user# 你之前写的鉴权方法
+from utils.security import get_current_user  # 你之前写的鉴权方法
 
 router = APIRouter()
 
@@ -23,8 +23,8 @@ async def submit_answer(
     if not user_id:
         raise HTTPException(status_code=401, detail="用户信息无效")
     result = SubmissionService.submit_answer(user_id, submission.problem_id, submission.user_answer)
-    if not result.success:
-        raise HTTPException(status_code=400, detail=result.message)
+    if result.code >= 400:
+        raise HTTPException(status_code=result.code, detail=result.message)
     return result
 
 
@@ -44,9 +44,14 @@ def get_submissions(
     submission_id:int,
     current_user: dict = Depends(get_current_user)
 ):
-    result=SubmissionService.get_submission_by_id(submission_id)
-    if result.data.user_id != current_user.get("user_id") and admin_required():
-        raise HTTPException(status_code=401, detail="无访问权限")
+    result = SubmissionService.get_submission_by_id(submission_id)
+    if result.code >= 400 or not result.data:
+        raise HTTPException(status_code=result.code, detail=result.message)
+
+    submission = result.data
+    if submission.user_id != current_user.get("user_id") and current_user.get("name") != "admin":
+        raise HTTPException(status_code=403, detail="无访问权限")
+
     return result
 @router.get("/user", response_model=Result[List[Submission]])
 def get_all_user_submissions(
@@ -63,16 +68,12 @@ def get_all_user_submissions(
 def update_submission_status(
     submission_id: int,
     status: str,
-    current_user: dict = Depends(get_current_user)
+    _: dict = Depends(admin_required)
 ):
     """
-    更新提交状态（需要登录，一般给判题机管理员用）
+    更新提交状态（仅限管理员）
     """
-    # 这里可选：限制只有管理员能更新
-    if current_user.get("username") != "admin":
-        raise HTTPException(status_code=403, detail="只有管理员能更新提交状态")
-
     result = SubmissionService.update_submission_status(submission_id, status)
-    if not result.success:
-        raise HTTPException(status_code=404, detail=result.message)
+    if result.code >= 400:
+        raise HTTPException(status_code=result.code, detail=result.message)
     return result

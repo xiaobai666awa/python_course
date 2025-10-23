@@ -4,7 +4,7 @@ import time
 
 
 class HojClient:
-    def __init__(self, base_url="http://127.0.0.1", username="python_course0", password="maekoz"):
+    def __init__(self, base_url="http://127.0.0.1", username="11", password="sok3se"):
         self.base_url = base_url
         self.username = username
         self.password = password
