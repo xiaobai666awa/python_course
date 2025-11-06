@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Optional
 
 from sqlmodel import Session
@@ -9,7 +8,6 @@ from mapper.SubmissionMapper import SubmissionMapper
 from pojo.Problem import Problem, ProblemType
 from pojo.Result import Result
 from pojo.Submission import Submission, SubmissionPage, SubmissionRead, SubmissionUpdate
-from service.HojService import HojClient
 
 
 class SubmissionService:
@@ -36,9 +34,9 @@ class SubmissionService:
         SubmissionMapper.insert(submission)
 
         if is_coding:
-            asyncio.create_task(
-                SubmissionService._judge_with_hoj(submission.id, problem.code_id, user_answer)
-            )
+            status = SubmissionService._evaluate_coding_answer(problem, user_answer)
+            SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
+            submission.status = status
         else:
             status = SubmissionService._evaluate_answer(problem.answer, user_answer)
             SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
@@ -46,25 +44,6 @@ class SubmissionService:
 
         return Result.success(data=submission, message="提交成功")
 
-    @staticmethod
-    async def _judge_with_hoj(submission_id: int, code_id: int, code: str):
-            """
-            异步提交到 HOJ 并回写数据库
-            """
-            client = HojClient()
-            submit_id = await client.submit(pid=str(code_id), code=code)
-
-            # 轮询判题结果
-            while True:
-                result = await client.get_result(submit_id)
-                status = result
-                if status <1:
-                    status = "accepted" if status == 0 else "rejected"
-                    submission=SubmissionMapper.find_by_id(submission_id)
-                    submission_update=SubmissionUpdate(status=status,user_answer=code)
-                    SubmissionMapper.update(submission, submission_update)
-                    break
-                await asyncio.sleep(2)
     @staticmethod
     def get_user_submissions(user_id: int, problem_id: int) -> Result[List[Submission]]:
         with Session(get_engine()) as session:
@@ -119,3 +98,10 @@ class SubmissionService:
         if correct_answer and correct_answer == user_answer:
             return "accepted"
         return "wrong"
+
+    @staticmethod
+    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> str:
+        correct_answer = getattr(problem, "answer", None)
+        if correct_answer is None:
+            return "accepted"
+        return "accepted" if correct_answer.strip() == user_answer.strip() else "wrong"

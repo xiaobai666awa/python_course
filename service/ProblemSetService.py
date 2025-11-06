@@ -1,12 +1,11 @@
 from typing import List, Optional
 
-from sqlmodel import Session, select
-
 from config import get_engine
+from mapper.ProblemMapper import ProblemMapper
 from mapper.ProblemSetMapper import ProblemSetCompletionMapper, ProblemSetMapper
-from mapper.SubmissionMapper import SubmissionMapper
+from mapper.ProblemSetSubmissionMapper import ProblemSetSubmissionMapper
 from mapper.UserMapper import UserMapper
-from pojo.Problem import Problem
+from pojo.Problem import Problem, ProblemType
 from pojo.ProblemSet import (
     ProblemSet,
     ProblemSetCreate,
@@ -17,7 +16,6 @@ from pojo.ProblemSet import (
     ProblemSetUpdate,
 )
 from pojo.Result import Result
-from pojo.Submission import Submission
 
 
 class ProblemSetService:
@@ -47,6 +45,45 @@ class ProblemSetService:
         if not deleted:
             return Result.error(message="题集不存在", code=404)
         return Result.success(message="成功删除题集")
+
+    @staticmethod
+    def submit_problem_answer(problem_set_id: int, problem_id: int, user_id: int, answer: str) -> Result[ProblemSetProblemStatus]:
+        problem_set = ProblemSetMapper.find_by_id(problem_set_id)
+        if not problem_set:
+            return Result.error(message="题集不存在", code=404)
+        if problem_id not in problem_set.problem_ids:
+            return Result.error(message="题目不属于该题集", code=400)
+
+        problem = ProblemMapper.find_by_id(problem_id)
+        if not problem:
+            return Result.error(message="题目不存在", code=404)
+
+        normalized_answer = answer.strip()
+
+        if ProblemSetService._is_coding_problem(problem):
+            status = ProblemSetService._evaluate_coding_answer(problem, normalized_answer)
+        else:
+            status = ProblemSetService._evaluate_answer(problem.answer, normalized_answer)
+
+        submission = ProblemSetSubmissionMapper.upsert(
+            problem_set_id, problem_id, user_id, normalized_answer, status
+        )
+
+        if ProblemSetService._has_user_completed_problem_set(problem_set, user_id):
+            ProblemSetCompletionMapper.mark_completed(user_id, problem_set_id)
+        else:
+            ProblemSetCompletionMapper.unmark_completed(user_id, problem_set_id)
+
+        revealed = ProblemSetService._has_user_completed_problem_set(problem_set, user_id)
+        problem_status = ProblemSetProblemStatus(
+            problem_id=problem_id,
+            status=submission.status,
+            user_answer=submission.answer,
+            answer=problem.answer if revealed else None,
+            solution=getattr(problem, "solution", None) if revealed else None,
+        )
+
+        return Result.success(data=problem_status, message="提交成功")
 
     @staticmethod
     def list_problem_sets(
@@ -86,65 +123,52 @@ class ProblemSetService:
         return Result.success(message="已取消题集完成标记")
 
     @staticmethod
-    def refresh_completion_for_user(user_id: int, problem_ids: List[int]) -> None:
-        if not problem_ids:
-            return
-
-        related_problem_ids = set(problem_ids)
-        problem_sets = ProblemSetMapper.find_all()
-
-        for problem_set in problem_sets:
-            if not problem_set.problem_ids:
-                continue
-
-            if not related_problem_ids.intersection(problem_set.problem_ids):
-                continue
-
-            completed = ProblemSetService._has_user_completed_problem_set(problem_set, user_id)
-            if completed:
-                ProblemSetCompletionMapper.mark_completed(user_id, problem_set.id)
-            else:
-                ProblemSetCompletionMapper.unmark_completed(user_id, problem_set.id)
-
-    @staticmethod
     def _build_status(problem_set: ProblemSet, current_user_id: Optional[int]) -> ProblemSetStatus:
         completions = ProblemSetCompletionMapper.list_by_problem_set(problem_set.id)
-        completed_users = []
         completion_user_ids = {comp.user_id for comp in completions}
-
+        completed_users = []
         for user_id in completion_user_ids:
             user = UserMapper.find_by_id(user_id)
             if user:
                 completed_users.append(UserMapper.to_read(user))
 
-        is_completed = False
-        solved_count = 0
         problem_statuses: List[ProblemSetProblemStatus] = []
+        solved_count = 0
+        answers_revealed = False
 
         if current_user_id is not None:
-            status_map = SubmissionMapper.last_status_by_user_for_problems(
-                current_user_id, problem_set.problem_ids
-            )
+            submissions_map = ProblemSetSubmissionMapper.map_latest_by_user(problem_set.id, current_user_id)
+            problems = {pid: ProblemMapper.find_by_id(pid) for pid in problem_set.problem_ids}
+            answers_revealed = ProblemSetService._has_user_completed_problem_set(problem_set, current_user_id)
+
             for pid in problem_set.problem_ids:
-                submission = status_map.get(pid)
+                submission = submissions_map.get(pid)
                 status = submission.status if submission else None
                 if status == "accepted":
                     solved_count += 1
-                problem_statuses.append(ProblemSetProblemStatus(problem_id=pid, status=status))
 
-            if current_user_id in completion_user_ids:
-                is_completed = True
-            else:
-                if ProblemSetService._has_user_completed_problem_set(problem_set, current_user_id):
+                problem = problems.get(pid)
+                answer = problem.answer if problem else None
+                solution = getattr(problem, "solution", None) if problem else None
+
+                problem_statuses.append(
+                    ProblemSetProblemStatus(
+                        problem_id=pid,
+                        status=status,
+                        user_answer=submission.answer if submission else None,
+                        answer=answer if answers_revealed else None,
+                        solution=solution if answers_revealed else None,
+                    )
+                )
+
+            if answers_revealed:
+                if current_user_id not in completion_user_ids:
                     ProblemSetCompletionMapper.mark_completed(current_user_id, problem_set.id)
-                    is_completed = True
                     user = UserMapper.find_by_id(current_user_id)
                     if user:
                         completed_users.append(UserMapper.to_read(user))
-        else:
-            problem_statuses = []
-
-        total_problems = len(problem_set.problem_ids)
+            else:
+                ProblemSetCompletionMapper.unmark_completed(current_user_id, problem_set.id)
 
         return ProblemSetStatus(
             id=problem_set.id,
@@ -154,24 +178,35 @@ class ProblemSetService:
             created_at=problem_set.created_at,
             updated_at=problem_set.updated_at,
             completed_users=completed_users,
-            is_completed=is_completed,
-            solved_count=solved_count if current_user_id is not None else 0,
+            is_completed=answers_revealed,
+            solved_count=solved_count,
             problem_statuses=problem_statuses,
+            answers_revealed=answers_revealed,
         )
 
     @staticmethod
     def _has_user_completed_problem_set(problem_set: ProblemSet, user_id: int) -> bool:
         if not problem_set.problem_ids:
             return False
+        submissions_map = ProblemSetSubmissionMapper.map_latest_by_user(problem_set.id, user_id)
+        return all(pid in submissions_map for pid in problem_set.problem_ids)
 
-        with Session(get_engine()) as session:
-            stmt = select(Submission.problem_id).where(
-                Submission.user_id == user_id,
-                Submission.status == "accepted",
-                Submission.problem_id.in_(problem_set.problem_ids),
-            )
-            accepted_problem_ids = {
-                row[0] if isinstance(row, tuple) else row for row in session.exec(stmt).all()
-            }
+    @staticmethod
+    def _evaluate_answer(correct_answer: Optional[str], user_answer: str) -> str:
+        if correct_answer is None:
+            return "accepted"
+        return "accepted" if correct_answer.strip() == user_answer.strip() else "wrong"
 
-        return all(problem_id in accepted_problem_ids for problem_id in problem_set.problem_ids)
+    @staticmethod
+    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> str:
+        reference = getattr(problem, "answer", None)
+        if reference is None or reference == "":
+            return "accepted"
+        return "accepted" if reference.strip() == user_answer.strip() else "wrong"
+
+    @staticmethod
+    def _is_coding_problem(problem: Problem) -> bool:
+        problem_type = getattr(problem, "type", None)
+        if isinstance(problem_type, ProblemType):
+            return problem_type == ProblemType.CODING
+        return str(problem_type).lower() in {"coding", "编程题"}

@@ -22,6 +22,7 @@ class Problem(SQLModel, table=True):
     description: str = Field(sa_column=Column(LONGTEXT))
     options: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     answer: Optional[str] = Field(default=None)
+    solution: Optional[str] = Field(default=None, sa_column=Column(LONGTEXT))
 
 
 # 请求模型（用于创建）
@@ -32,6 +33,7 @@ class ProblemCreate(SQLModel):
     description: str
     options: Optional[List[str]] = None
     answer: Optional[str] = None
+    solution: Optional[str] = None
 
 
 # 响应模型（用于返回）
@@ -43,6 +45,7 @@ class ProblemRead(SQLModel):
     description: str
     options: Optional[List[str]] = None
     answer: Optional[str] = None
+    solution: Optional[str] = None
     class Config:
         from_attributes = True
 

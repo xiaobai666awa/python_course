@@ -58,9 +58,9 @@ class ProblemMapper:
             return results
     @staticmethod
     def create(problem: ProblemCreate) -> ProblemRead:
-        problem = ProblemMapper.from_create(problem)
+        problem_obj = ProblemMapper.from_create(problem)
         with Session(get_engine()) as session:
-            session.add(problem)
+            session.add(problem_obj)
             session.commit()
-            session.refresh(problem)
-        return ProblemMapper.to_read(problem)
+            session.refresh(problem_obj)
+        return ProblemMapper.to_read(problem_obj)

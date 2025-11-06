@@ -1,12 +1,17 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from Controller.UserController import admin_required
-from pojo.ProblemSet import ProblemSetCreate, ProblemSetPage, ProblemSetStatus, ProblemSetUpdate
+from pojo.ProblemSet import ProblemSetCreate, ProblemSetPage, ProblemSetProblemStatus, ProblemSetStatus, ProblemSetUpdate
 from pojo.Result import Result
 from service.ProblemSetService import ProblemSetService
 from utils.security import get_current_user, get_optional_user
+
+
+class ProblemSetAnswerPayload(BaseModel):
+    answer: str
 
 
 router = APIRouter()
@@ -74,6 +79,20 @@ def unmark_problem_set_completed(
     current_user: dict = Depends(get_current_user),
 ):
     result = ProblemSetService.unmark_completion(problem_set_id, current_user["user_id"])
+    return _ensure_success(result)
+
+
+@router.post("/{problem_set_id}/problems/{problem_id}/answer", response_model=Result[ProblemSetProblemStatus])
+def submit_problem_set_answer(
+    problem_set_id: int,
+    problem_id: int,
+    payload: ProblemSetAnswerPayload,
+    current_user: dict = Depends(get_current_user),
+):
+    answer = payload.answer
+    result = ProblemSetService.submit_problem_answer(
+        problem_set_id, problem_id, current_user["user_id"], answer
+    )
     return _ensure_success(result)
 
 
