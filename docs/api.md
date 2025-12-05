@@ -62,7 +62,52 @@
 ```
 
 - 当 `type` 为 `coding` 时必须提供 `code_id`；`choice` 题需提供 `options`。
+- 提交 `coding` 题目时会实时校验 HOJ 是否存在该 `code_id`，若不存在将返回错误，避免引用无效题号。
 - 响应：`Result[ProblemRead]`
+
+### 批量导入题目（管理员）
+
+- `POST /problems/import?fmt=auto`
+- 请求为 `multipart/form-data`，字段 `file` 为需上传的 JSON / YAML 文本（默认自动识别）。
+- 响应：`Result[List[ProblemRead]]`，返回所有成功导入的题目。
+- 文件限制：默认大小 2MB，可通过环境变量 `PROBLEM_IMPORT_MAX_BYTES` 调整。
+- 编程题的 `code_id` 会逐个校验 HOJ 是否存在，若失败会跳过并给出提示。
+
+#### JSON 示例
+
+```json
+[
+  {
+    "title": "二分查找",
+    "type": "choice",
+    "description": "二分查找的时间复杂度是？",
+    "options": ["O(logN)", "O(N)", "O(NlogN)"],
+    "answer": "O(logN)",
+    "solution": "每轮将区间一分为二。"
+  },
+  {
+    "title": "两数之和",
+    "type": "coding",
+    "description": "返回数组中两数之和等于 target 的索引。",
+    "code_id": 1001
+  }
+]
+```
+
+#### 文本（YAML）示例
+
+```yaml
+- title: 快速排序
+  type: fill
+  description: "快速排序的平均时间复杂度是 ______。"
+  answer: O(N log N)
+- title: 求最大值
+  type: coding
+  description: "实现一个函数，返回数组的最大值。"
+  code_id: 1002
+```
+
+> `fmt` 参数可指定 `json` 或 `text`，默认 `auto`。文本模式使用 YAML 语法，普通 `.txt` 文件亦可。
 
 ## 题集模块
 

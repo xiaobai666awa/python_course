@@ -8,6 +8,7 @@ from Controller.ProblemController import router as problem_router
 from Controller.SubmissionController import router as submission_router
 from Controller.ProblemSetController import router as problem_set_router
 from Controller.AdminController import router as admin_router
+from service.UserService import UserService
 
 
 
@@ -17,6 +18,9 @@ def create_db_and_tables():
 
 
 def create_app() -> FastAPI:
+    create_db_and_tables()
+    UserService.ensure_admin_user()
+
     app = FastAPI(title="Online Judge API", version="1.0.0")
 
     # 注册路由

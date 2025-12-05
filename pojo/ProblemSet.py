@@ -89,6 +89,12 @@ class ProblemSetSubmission(SQLModel, table=True):
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-ProblemSetStatus.model_rebuild(force=True)
-ProblemSetPage.model_rebuild(force=True)
-ProblemSetSubmission.model_rebuild(force=True)
+def _refresh_model(model_cls):
+    if hasattr(model_cls, "model_rebuild"):
+        model_cls.model_rebuild(force=True)
+    elif hasattr(model_cls, "update_forward_refs"):
+        model_cls.update_forward_refs()
+
+
+for _model in (ProblemSetStatus, ProblemSetPage, ProblemSetSubmission):
+    _refresh_model(_model)

@@ -1,3 +1,4 @@
+from time import sleep
 from typing import List, Optional
 
 from sqlmodel import Session
@@ -8,6 +9,8 @@ from mapper.SubmissionMapper import SubmissionMapper
 from pojo.Problem import Problem, ProblemType
 from pojo.Result import Result
 from pojo.Submission import Submission, SubmissionPage, SubmissionRead, SubmissionUpdate
+from service.HojService import HojClient
+from service.choice_utils import is_choice_problem, normalize_choice_answer
 
 
 class SubmissionService:
@@ -34,11 +37,13 @@ class SubmissionService:
         SubmissionMapper.insert(submission)
 
         if is_coding:
-            status = SubmissionService._evaluate_coding_answer(problem, user_answer)
+            status,error = SubmissionService._evaluate_coding_answer(problem, user_answer)
             SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
             submission.status = status
+            if error:
+                return Result.error(message=error, code=502)
         else:
-            status = SubmissionService._evaluate_answer(problem.answer, user_answer)
+            status = SubmissionService._evaluate_answer(problem, user_answer)
             SubmissionMapper.update(submission, SubmissionUpdate(status=status, user_answer=user_answer))
             submission.status = status
 
@@ -94,14 +99,49 @@ class SubmissionService:
         return str(problem_type).lower() in {"coding", "编程题"}
 
     @staticmethod
-    def _evaluate_answer(correct_answer: Optional[str], user_answer: str) -> str:
+    def _evaluate_answer(problem: Problem, user_answer: str) -> str:
+        options = getattr(problem, "options", None)
+        correct_answer = getattr(problem, "answer", None)
+
+        if is_choice_problem(problem):
+            normalized_correct = normalize_choice_answer(correct_answer, options)
+            normalized_user = normalize_choice_answer(user_answer, options)
+            if not normalized_correct or not normalized_user:
+                return "wrong"
+            return "accepted" if normalized_correct == normalized_user else "wrong"
+
         if correct_answer and correct_answer == user_answer:
             return "accepted"
         return "wrong"
 
     @staticmethod
-    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> str:
-        correct_answer = getattr(problem, "answer", None)
-        if correct_answer is None:
-            return "accepted"
-        return "accepted" if correct_answer.strip() == user_answer.strip() else "wrong"
+    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> tuple[str, Optional[str]]:
+        code_id = getattr(problem, "code_id", None)
+        if code_id is None:
+            return "error", "编程题缺少判题配置"
+        client = HojClient()
+        try:
+            try:
+                submit_id = client.submit(pid=code_id, code=user_answer)
+            except ValueError as exc:
+                return "error", str(exc)
+
+            status = client.get_result(submit_id)
+            # HOJ 中 5/6/7 通常表示评测中，这里继续轮询直到获得最终态
+            while status in (5, 6, 7):
+                sleep(1)
+                status = client.get_result(submit_id)
+
+            if status is None:
+                return "error", "HOJ 未返回判题状态"
+
+            if status == -1:
+                return "wrong answer", "答案错误"
+            if status == 0:
+                return "accepted", None
+            if status == -3:
+                return "PLE", "输出格式错误"
+
+            return "error", f"HOJ 判题失败，状态：{status}"
+        finally:
+            client.close()

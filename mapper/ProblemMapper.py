@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from typing import List, Optional
 
 from config import get_engine
-from pojo.Problem import Problem, ProblemRead, ProblemCreate
+from pojo.Problem import Problem, ProblemRead, ProblemCreate, is_multi_choice_answer
 from pojo.Result import Result
 
 
@@ -12,7 +12,9 @@ class ProblemMapper:
     @staticmethod
     def to_read(problem: Problem) -> ProblemRead:
         """ORM -> ProblemRead"""
-        return ProblemRead.model_validate(problem)
+        read_model = ProblemRead.model_validate(problem)
+        read_model.is_multi_choice = is_multi_choice_answer(problem.type, read_model.answer)
+        return read_model
     @staticmethod
     def to_create(problem: Problem) -> ProblemCreate:
         """ORM -> ProblemCreate"""

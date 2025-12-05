@@ -16,6 +16,8 @@ from pojo.ProblemSet import (
     ProblemSetUpdate,
 )
 from pojo.Result import Result
+from service.HojService import HojService
+from service.choice_utils import is_choice_problem, normalize_choice_answer
 
 
 class ProblemSetService:
@@ -61,9 +63,11 @@ class ProblemSetService:
         normalized_answer = answer.strip()
 
         if ProblemSetService._is_coding_problem(problem):
-            status = ProblemSetService._evaluate_coding_answer(problem, normalized_answer)
+            status, error = ProblemSetService._evaluate_coding_answer(problem, normalized_answer)
+            if error:
+                return Result.error(message=error, code=502)
         else:
-            status = ProblemSetService._evaluate_answer(problem.answer, normalized_answer)
+            status = ProblemSetService._evaluate_answer(problem, normalized_answer)
 
         submission = ProblemSetSubmissionMapper.upsert(
             problem_set_id, problem_id, user_id, normalized_answer, status
@@ -192,17 +196,31 @@ class ProblemSetService:
         return all(pid in submissions_map for pid in problem_set.problem_ids)
 
     @staticmethod
-    def _evaluate_answer(correct_answer: Optional[str], user_answer: str) -> str:
+    def _evaluate_answer(problem: Problem, user_answer: str) -> str:
+        correct_answer = getattr(problem, "answer", None)
+        options = getattr(problem, "options", None)
+
+        if is_choice_problem(problem):
+            normalized_correct = normalize_choice_answer(correct_answer, options)
+            normalized_user = normalize_choice_answer(user_answer, options)
+            if normalized_correct is None or normalized_user is None:
+                return "wrong"
+            return "accepted" if normalized_correct == normalized_user else "wrong"
+
         if correct_answer is None:
             return "accepted"
-        return "accepted" if correct_answer.strip() == user_answer.strip() else "wrong"
+        return "accepted" if str(correct_answer).strip() == user_answer.strip() else "wrong"
 
     @staticmethod
-    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> str:
-        reference = getattr(problem, "answer", None)
-        if reference is None or reference == "":
-            return "accepted"
-        return "accepted" if reference.strip() == user_answer.strip() else "wrong"
+    def _evaluate_coding_answer(problem: Problem, user_answer: str) -> tuple[str, Optional[str]]:
+        code_id = getattr(problem, "code_id", None)
+        if code_id is None:
+            return "error", "编程题缺少判题配置"
+
+        status, error = HojService.judge_submission(int(code_id), user_answer)
+        if status:
+            return HojService.normalize_status(status), None
+        return "error", error or "HOJ 判题失败"
 
     @staticmethod
     def _is_coding_problem(problem: Problem) -> bool:

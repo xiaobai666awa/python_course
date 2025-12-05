@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File
 from typing import List
 
 from Controller.UserController import admin_required
@@ -31,6 +31,16 @@ def get_problems(
 @router.post("/create", response_model=Result[ProblemRead])
 def create_problem(problem: ProblemCreate,_: dict = Depends(admin_required)):
     return _ensure_success(ProblemService.create_problem(problem))
+
+@router.post("/import", response_model=Result[List[ProblemRead]])
+async def import_problems(
+    file: UploadFile = File(...),
+    fmt: str = Query("auto", description="文件格式，可选 auto/json/text"),
+    _: dict = Depends(admin_required),
+):
+    file_bytes = await file.read()
+    fmt_value = None if fmt.lower() == "auto" else fmt.lower()
+    return _ensure_success(ProblemService.import_problems_from_file(file_bytes, fmt_value))
 
 
 def _ensure_success(result: Result):

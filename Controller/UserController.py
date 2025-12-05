@@ -1,5 +1,3 @@
-import csv
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from starlette import status
@@ -52,8 +50,8 @@ def get_me(current_user=Depends(get_current_user)) -> Result:
 async def import_users(file: UploadFile= File(...), _: dict = Depends(admin_required)):
     """批量导入用户（仅限 admin）"""
     try:
-        # 调用 service 方法，传入文件流
-        result: Result[list[UserRead]] = UserService.import_users_from_csv(file.file)
+        file_bytes = await file.read()
+        result: Result[list[UserRead]] = UserService.import_users_from_csv(file_bytes)
         return result
     except Exception as e:
         # 捕获 service 之外的异常
